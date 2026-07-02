@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Thread: Prospect Run</title>
+<style>
+  :root {
+    --bg: #0a0a0f;
+    --surface: #13131a;
+    --border: #2a2a3a;
+    --accent: #dc2626;
+    --accent2: #b91c1c;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --green: #22c55e;
+    --yellow: #eab308;
+    --red: #ef4444;
+    --font-mono: 'Space Mono', monospace;
+    --font-sans: 'Inter', sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 16px;
+  }
+  @import url('https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@400;600&display=swap');
+
+  #game-header {
+    width: 800px;
+    max-width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0 12px;
+  }
+  #game-header h1 {
+    font-family: var(--font-mono);
+    font-size: 1rem;
+    color: var(--accent);
+    letter-spacing: 0.05em;
+  }
+  #btn-briefing {
+    background: var(--surface);
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    padding: 6px 14px;
+    cursor: pointer;
+    border-radius: 4px;
+    transition: background 0.2s;
+  }
+  #btn-briefing:hover { background: var(--accent2); color: #fff; }
+
+  #canvas-wrapper {
+    position: relative;
+    width: 800px;
+    max-width: 100%;
+  }
+  canvas {
+    display: block;
+    background: #111;
+    border: 1px solid var(--border);
+    width: 800px;
+    max-width: 100%;
+  }
+
+  /* HUD */
+  #hud {
+    width: 800px;
+    max-width: 100%;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-top: none;
+    font-family: var(--font-mono);
+    font-size: 0.8rem;
+  }
+  #hud-score { color: var(--accent); font-weight: 700; }
+  #hud-pogs { color: var(--text); }
+  #hud-city { color: var(--muted); }
+  #score-flash {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--font-mono);
+    font-size: 1.5rem;
+    color: var(--yellow);
+    font-weight: 700;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s;
+    text-shadow: 0 0 10px var(--yellow);
+  }
+
+  /* OVERLAYS */
+  .overlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: rgba(0,0,0,0.88);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 24px 20px;
+    overflow-y: auto;
+  }
+  .overlay.hidden { display: none; }
+  .overlay-start { justify-content: flex-start; }
+  .overlay-center { justify-content: center; }
+
+  .overlay h2 {
+    font-family: var(--font-mono);
+    color: var(--accent);
+    font-size: 1.3rem;
+    margin-bottom: 6px;
+    text-align: center;
+  }
+  .overlay p {
+    color: var(--muted);
+    font-size: 0.8rem;
+    text-align: center;
+    margin-bottom: 16px;
+    max-width: 420px;
+  }
+  .overlay input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 0.9rem;
+    padding: 8px 12px;
+    width: 260px;
+    border-radius: 4px;
+    margin-bottom: 12px;
+  }
+  .overlay input:focus { outline: none; border-color: var(--accent); }
+  .btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    font-family: var(--font-mono);
+    font-size: 0.85rem;
+    padding: 10px 24px;
+    cursor: pointer;
+    border-radius: 4px;
+    margin: 4px;
+    transition: background 0.2s;
+  }
+  .btn:hover { background: var(--accent2); }
+  .btn-ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+  }
+  .btn-ghost:hover { border-color: var(--accent); color: var(--accent); background: transparent; }
+
+  .divider {
+    width: 100%;
+    max-width: 300px;
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 16px 0;
+  }
+  .resume-row {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+  .status-msg {
+    font-size: 0.75rem;
+    color: var(--muted);
+    min-height: 18px;
+    text-align: center;
+  }
+  .status-msg.ok { color: var(--green); }
+  .status-msg.err { color: var(--red); }
+
+  /* LEADERBOARD */
+  .lb-table {
+    width: 100%;
+    max-width: 420px;
+    border-collapse: collapse;
+    margin-top: 12px;
+    font-size: 0.78rem;
+  }
+  .lb-table th {
+    color: var(--muted);
+    font-family: var(--font-mono);
+    text-align: left;
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  .lb-table td {
+    padding: 5px 8px;
+    border-bottom: 1px solid #1a1a24;
+    font-family: var(--font-mono);
+  }
+  .lb-table tr.me td { color: var(--yellow); }
+
+  /* QUIZ PANEL */
+  #overlay-quiz .quiz-q {
+    font-family: var(--font-mono);
+    font-size: 0.95rem;
+    color: var(--text);
+    text-align: center;
+    margin-bottom: 20px;
+    max-width: 420px;
+    line-height: 1.5;
+  }
+  .quiz-options { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 380px; }
+  .quiz-opt {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: 0.82rem;
+    padding: 10px 14px;
+    cursor: pointer;
+    border-radius: 4px;
+    text-align: left;
+    transition: border-color 0.15s;
+  }
+  .quiz-opt:hover { border-color: var(--accent); }
+  .quiz-opt.correct { border-color: var(--green); color: var(--green); }
+  .quiz-opt.wrong { border-color: var(--red); color: var(--red); }
+  .quiz-feedback {
+    margin-top: 14px;
+    font-size: 0.8rem;
+    min-height: 20px;
+    text-align: center;
+    font-family: var(--font-mono);
+  }
+  .quiz-feedback.ok { color: var(--green); }
+  .quiz-feedback.bad { color: var(--red); }
+
+  /* MR B MANUAL */
+  #overlay-manual .manual-inner {
+    display: flex;
+    gap: 24px;
+    width: 100%;
+    max-width: 620px;
+    align-items: flex-start;
+  }
+  #overlay-manual .mrb-portrait {
+    width: 160px;
+    min-width: 160px;
+    border-radius: 6px;
+    border: 2px solid var(--accent);
+    object-fit: cover;
+  }
+  #overlay-manual .manual-content {
+    flex: 1;
+    font-size: 0.78rem;
+    line-height: 1.6;
+    color: var(--text);
+  }
+  #overlay-manual .manual-content h3 {
+    font-family: var(--font-mono);
+    color: var(--accent);
+    font-size: 0.85rem;
+    margin: 12px 0 4px;
+  }
+  #overlay-manual .manual-content h3:first-child { margin-top: 0; }
+  #overlay-manual .manual-content .muted-line {
+    color: var(--muted);
+    font-style: italic;
+    font-size: 0.75rem;
+    margin-bottom: 6px;
+  }
+  #overlay-manual .manual-content ul {
+    list-style: none;
+    padding: 0;
+  }
+  #overlay-manual .manual-content ul li::before { content: '› '; color: var(--accent); }
+  #overlay-manual .manual-header {
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--muted);
+    font-style: italic;
+    text-align: center;
+    margin-bottom: 16px;
+    max-width: 520px;
+  }
+
+  /* TEXTBOOK LINK BANNER */
+  .textbook-banner {
+    margin-top: 16px;
+    background: rgba(220,38,38,0.1);
+    border: 1px solid rgba(220,38,38,0.3);
+    border-radius: 4px;
+    padding: 8px 16px;
+    font-size: 0.78rem;
+    font-family: var(--font-mono);
+    text-align: center;
+  }
+  .textbook-banner a { color: var(--accent); text-decoration: none; }
+  .textbook-banner a:hover { text-decoration: underline; }
+
+  /* SESSION ID box */
+  .session-box {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 10px 14px;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    color: var(--muted);
+    text-align: center;
+    margin-top: 10px;
+    max-width: 380px;
+    word-break: break-all;
+  }
+  .session-box span { color: var(--yellow); }
+  .copy-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    padding: 3px 8px;
+    cursor: pointer;
+    border-radius: 3px;
+    margin-top: 4px;
+  }
+  .copy-btn:hover { border-color: var(--accent); color: var(--accent); }
+</style>
+</head>
+<body>
+
+<div id="game-header">
+  <h1>📍 THE THREAD: PROSPECT RUN</h1>
+  <button id="btn-briefing" onclick="openManual()">📋 Mr. B's Briefing</button>
+</div>
+
+<div id="canvas-wrapper">
+  <canvas id="gameCanvas" width="800" height="608"></canvas>
+
+  <div id="score-flash"></div>
+
+  <!-- START OVERLAY -->
+  <div id="overlay-start" class="overlay overlay-start">
+    <h2>THE THREAD<br>PROSPECT RUN</h2>
+    <p>Navigate the city. Collect prospect pogs. Answer Mr. Bigglesworth's questions — or face the consequences.</p>
+    <input id="input-name" type="text" placeholder="Enter your name" maxlength="24" />
+    <button class="btn" onclick="startGame()">▶ Start in Millhaven</button>
+    <hr class="divider">
+    <p style="margin-bottom:8px;">or resume a saved session</p>
+    <div class="resume-row">
+      <input id="input-session" type="text" placeholder="Paste Session ID" style="margin-bottom:0;width:200px;" />
+      <button class="btn" onclick="resumeSession()">↺ Load</button>
+    </div>
+    <div id="resume-status" class="status-msg"></div>
+    <p style="margin-top:16px;font-size:0.7rem;">Save your Session ID from the HUD after starting to resume later.</p>
+  </div>
+
+  <!-- PAUSE OVERLAY -->
+  <div id="overlay-pause" class="overlay overlay-center hidden">
+    <h2>PAUSED</h2>
+    <p>Take a breath. Mr. Bigglesworth is watching.</p>
+    <button class="btn" onclick="resumeGame()">▶ Resume</button>
+    <button class="btn btn-ghost" onclick="endRun()">✕ End Run</button>
+  </div>
+
+  <!-- QUIZ OVERLAY -->
+  <div id="overlay-quiz" class="overlay overlay-center hidden">
+    <h2 id="quiz-pog-label">PROSPECT POG</h2>
+    <div class="quiz-q" id="quiz-question"></div>
+    <div class="quiz-options" id="quiz-options"></div>
+    <div class="quiz-feedback" id="quiz-feedback"></div>
+    <button class="btn btn-ghost" id="quiz-continue-btn" style="margin-top:14px;display:none;" onclick="closeQuiz()">Continue</button>
+  </div>
+
+  <!-- CITY CLEAR OVERLAY -->
+  <div id="overlay-city-clear" class="overlay overlay-center hidden">
+    <h2>🏙 CITY CLEARED!</h2>
+    <p id="city-clear-msg"></p>
+    <button class="btn" id="btn-next-city" onclick="nextCity()">Next City →</button>
+    <button class="btn btn-ghost" onclick="endRun()">End Run</button>
+    <div class="textbook-banner">📖 <a href="https://andredavisme.github.io/the-thread-pdf/" target="_blank">Download The Thread textbook to go deeper →</a></div>
+  </div>
+
+  <!-- RUN END OVERLAY -->
+  <div id="overlay-run-end" class="overlay overlay-center hidden">
+    <h2>RUN COMPLETE</h2>
+    <p id="run-end-msg"></p>
+    <div id="session-id-box" class="session-box"></div>
+    <button class="btn" id="btn-copy-session" onclick="copySession()">📋 Copy Session ID</button>
+    <button class="btn btn-ghost" onclick="newRun()">↺ New Run</button>
+    <div class="textbook-banner">📖 <a href="https://andredavisme.github.io/the-thread-pdf/" target="_blank">Download The Thread textbook to go deeper →</a></div>
+    <h3 style="font-family:var(--font-mono);color:var(--muted);font-size:0.8rem;margin-top:20px;">LEADERBOARD</h3>
+    <table class="lb-table" id="lb-table">
+      <thead><tr><th>#</th><th>Player</th><th>Points</th><th>Pogs</th></tr></thead>
+      <tbody id="lb-body"></tbody>
+    </table>
+  </div>
+
+  <!-- MR B MANUAL OVERLAY -->
+  <div id="overlay-manual" class="overlay overlay-center hidden">
+    <h2>📋 MR. B'S BRIEFING</h2>
+    <div class="manual-header">"Fine. Since you clearly need hand-holding, I'll explain it once. Don't make me repeat myself."</div>
+    <div class="manual-inner">
+      <img class="mrb-portrait" id="mrb-img" src="" alt="Mr. Bigglesworth" />
+      <div class="manual-content">
+        <h3>🎯 The Mission</h3>
+        <div class="muted-line">"I didn't hire you to sightsee."</div>
+        <p>Walk the city, find the pogs, answer the question correctly and the prospect is yours. Wrong answer? They walk. And frankly, so should you.</p>
+
+        <h3>🕹 Controls</h3>
+        <div class="muted-line">"Try not to embarrass yourself."</div>
+        <ul>
+          <li>Arrow keys / WASD — Move</li>
+          <li>Space / E — Interact with a prospect</li>
+          <li>P — Pause (not that you deserve a break)</li>
+          <li>📋 That button up top — Interrupt me, apparently</li>
+        </ul>
+
+        <h3>💰 Scoring</h3>
+        <div class="muted-line">"Not all prospects are worth your time."</div>
+        <ul>
+          <li>Easy prospect — 1 pt</li>
+          <li>Medium prospect — 3 pts</li>
+          <li>Hard prospect — 5 pts</li>
+          <li>Clear a city — +10 bonus <em>(the bare minimum I expect)</em></li>
+          <li>Perfect quiz streak ×3 — +5 bonus</li>
+        </ul>
+
+        <h3>🏙 The Cities</h3>
+        <div class="muted-line">"Each city is worse than the last. That's by design. I'm testing you."</div>
+        <ul>
+          <li>City 1 — Basic prospecting. No excuses.</li>
+          <li>City 2 — I'm adding a clock. Prioritize or perish.</li>
+          <li>City 3 — Prospects move. Keep up.</li>
+          <li>City 4 — Not every door worth knocking on. Figure it out.</li>
+          <li>City 5 — A needle in a haystack. Several haystacks, actually.</li>
+        </ul>
+
+        <h3>💾 Your Session ID</h3>
+        <div class="muted-line">"Save it. I won't be rescuing your progress if you close the tab like an imbecile."</div>
+        <p>Your Session ID appears after starting. Copy it. Paste it on the start screen to resume.</p>
+      </div>
+    </div>
+    <button class="btn" style="margin-top:20px;" onclick="closeManual()">Get back to work, and stop bothering me, Peon.</button>
+  </div>
+
+</div>
+
+<!-- HUD -->
+<div id="hud">
+  <span id="hud-city">📍 Millhaven</span>
+  <span id="hud-pogs">🟢 Pogs: <b id="hud-pog-count">0</b> / <b id="hud-pog-total">8</b></span>
+  <span id="hud-score">Score: <b id="hud-score-val">0</b></span>
+</div>
+
+<script>
+// ─── SUPABASE CONFIG ───────────────────────────────────────────────────────
+const SUPABASE_URL = 'https://hhyhulqngdkwsxhymmcd.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhoeWh1bHFuZ2Rrd3N4aHltbWNkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzcxMzEyMDEsImV4cCI6MjA5MjcwNzIwMX0.dmSy7Q8Je5lEY4XCFzwvfPnkBYLebPE0yZMhy6Y8czI';
+
+async function dbFetch(table, opts = {}) {
+  const { method = 'GET', body, select = '*', filters = '', order = '', limit = '' } = opts;
+  let url = `${SUPABASE_URL}/rest/v1/${table}?select=${select}`;
+  if (filters) url += `&${filters}`;
+  if (order) url += `&order=${order}`;
+  if (limit) url += `&limit=${limit}`;
+  const res = await fetch(url, {
+    method,
+    headers: {
+      'apikey': SUPABASE_KEY,
+      'Authorization': `Bearer ${SUPABASE_KEY}`,
+      'Content-Type': 'application/json',
+      'Prefer': method === 'POST' ? 'return=representation' : 'return=minimal'
+    },
+    body: body ? JSON.stringify(body) : undefined
+  });
+  if (!res.ok) { const e = await res.text(); console.error(e); return null; }
+  const ct = res.headers.get('content-type') || '';
+  return ct.includes('json') ? res.json() : null;
+}
+
+// ─── GAME STATE ────────────────────────────────────────────────────────────
+const STATE = {
+  phase: 'start',   // start | playing | paused | quiz | city-clear | run-end | manual-open
+  prePausePhase: 'playing',
+  score: 0,
+  pogsCollected: 0,
+  quizStreak: 0,
+  citiesCleared: 0,
+  cityIndex: 0,
+  playerId: null,
+  sessionId: null,
+  playerName: '',
+  timerActive: false,
+  timerSeconds: 0,
+  timerInterval: null,
+  activeQuizPog: null,
+  lastScore: 0
+};
+
+// ─── TILEMAP ───────────────────────────────────────────────────────────────
+const TILE = { ROAD:0, SIDEWALK:1, BUILDING:2, PARK:3, WALL:4, DOOR:5 };
+const TILE_COLORS = {
+  0: '#2a2a2a', 1: '#3a3a3a', 2: '#1a2233', 3: '#1a3320', 4: '#111', 5: '#8B4513'
+};
+const COLS = 25, ROWS = 19, TS = 32;
+
+// Millhaven map (25×19)
+const MILLHAVEN = [
+  [4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4],
+  [4,2,2,2,2,1,0,0,0,0,0,0,1,2,2,2,2,1,0,0,0,0,2,2,4],
+  [4,2,2,2,2,1,0,0,0,0,0,0,1,2,2,2,2,1,0,0,0,0,2,2,4],
+  [4,5,1,1,1,1,0,0,0,0,0,0,1,1,1,5,1,1,0,0,0,0,1,5,4],
+  [4,1,1,3,3,1,0,0,0,0,0,0,1,3,3,1,1,1,0,0,0,0,1,1,4],
+  [4,1,1,3,3,1,0,0,0,0,0,0,1,3,3,1,1,1,0,0,0,0,1,1,4],
+  [4,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,1,1,4],
+  [4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4],
+  [4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4],
+  [4,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,1,1,4],
+  [4,1,1,3,3,1,0,0,0,0,0,0,1,3,3,1,1,1,0,0,0,0,1,1,4],
+  [4,1,1,3,3,1,0,0,0,0,0,0,1,3,3,1,1,1,0,0,0,0,1,1,4],
+  [4,5,1,1,1,1,0,0,0,0,0,0,1,1,1,5,1,1,0,0,0,0,1,5,4],
+  [4,2,2,2,2,1,0,0,0,0,0,0,1,2,2,2,2,1,0,0,0,0,2,2,4],
+  [4,2,2,2,2,1,0,0,0,0,0,0,1,2,2,2,2,1,0,0,0,0,2,2,4],
+  [4,1,1,1,1,1,0,0,1,1,1,1,1,1,1,1,1,1,0,0,0,0,1,1,4],
+  [4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4],
+  [4,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,4],
+  [4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4,4]
+];
+
+function tileWalkable(t) { return t === TILE.ROAD || t === TILE.SIDEWALK || t === TILE.PARK || t === TILE.DOOR; }
+
+// ─── PLAYER ────────────────────────────────────────────────────────────────
+const player = { x: 12 * TS + TS/2, y: 8 * TS + TS/2, speed: 2.5, dir: 0 };
+const keys = {};
+
+// ─── POGS ──────────────────────────────────────────────────────────────────
+const POG_DEFS = [
+  { x:7,  y:7,  diff:'easy',   pts:1,  table:'customer',   q:'What is the first step in the customer data journey?', opts:['Customer Record','Quote','Delivery','Invoice'], ans:0 },
+  { x:10, y:8,  diff:'medium', pts:3,  table:'request',    q:'A customer submits a request. What comes next in the pipeline?', opts:['Order','Estimate','Delivery','Adjustment'], ans:1 },
+  { x:18, y:7,  diff:'easy',   pts:1,  table:'estimate',   q:'An estimate is created FROM a request. What field links them?', opts:['customer_id','request_id','quote_id','order_id'], ans:1 },
+  { x:18, y:11, diff:'medium', pts:3,  table:'quote',      q:'A quote is the formal price offer. What is its typical status on creation?', opts:['approved','draft','sent','expired'], ans:2 },
+  { x:7,  y:11, diff:'hard',   pts:5,  table:'order',      q:'An order is created when a quote is accepted. Which status means it is being fulfilled?', opts:['pending','in_progress','complete','cancelled'], ans:1 },
+  { x:12, y:4,  diff:'easy',   pts:1,  table:'delivery',   q:'A delivery record is linked to which table directly above it in the pipeline?', opts:['quote','estimate','order','request'], ans:2 },
+  { x:12, y:14, diff:'medium', pts:3,  table:'adjustment', q:'An adjustment modifies an existing record. Which pipeline stage does it most commonly correct?', opts:['request','delivery','estimate','order'], ans:1 },
+  { x:20, y:8,  diff:'hard',   pts:5,  table:'response',   q:'The response record closes the loop. It references which final action from the customer?', opts:['payment','feedback','reorder','all of the above'], ans:3 }
+];
+
+let pogs = [];
+function resetPogs() {
+  pogs = POG_DEFS.map(p => ({ ...p, px: p.x * TS + TS/2, py: p.y * TS + TS/2, collected: false, pulse: 0 }));
+}
+
+// ─── CANVAS & LOOP ─────────────────────────────────────────────────────────
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+let animId = null;
+
+function drawTile(x, y, t) {
+  ctx.fillStyle = TILE_COLORS[t] || '#222';
+  ctx.fillRect(x * TS, y * TS, TS, TS);
+  if (t === TILE.PARK) {
+    ctx.fillStyle = 'rgba(34,197,94,0.15)';
+    ctx.fillRect(x * TS + 2, y * TS + 2, TS - 4, TS - 4);
+  }
+  if (t === TILE.DOOR) {
+    ctx.fillStyle = '#a0522d';
+    ctx.fillRect(x * TS + 10, y * TS + 18, 12, 14);
+  }
+}
+
+function drawMap() {
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS; c++)
+      drawTile(c, r, MILLHAVEN[r][c]);
+}
+
+function drawPogs() {
+  pogs.forEach(p => {
+    if (p.collected) return;
+    p.pulse = (p.pulse + 0.06) % (Math.PI * 2);
+    const scale = 1 + Math.sin(p.pulse) * 0.12;
+    const r = 9 * scale;
+    const color = p.diff === 'easy' ? '#22c55e' : p.diff === 'medium' ? '#eab308' : '#ef4444';
+    ctx.save();
+    ctx.translate(p.px, p.py);
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.globalAlpha = 0.85;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    ctx.restore();
+  });
+}
+
+function drawPlayer() {
+  ctx.save();
+  ctx.fillStyle = '#60a5fa';
+  ctx.beginPath();
+  ctx.arc(player.x, player.y, 9, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = '#fff';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+  // Direction indicator
+  const dirs = [[0,-12],[12,0],[0,12],[-12,0]];
+  const [dx, dy] = dirs[player.dir];
+  ctx.beginPath();
+  ctx.moveTo(player.x, player.y);
+  ctx.lineTo(player.x + dx * 0.6, player.y + dy * 0.6);
+  ctx.strokeStyle = '#bfdbfe';
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+  ctx.restore();
+}
+
+function drawNearPogHint() {
+  pogs.forEach(p => {
+    if (p.collected) return;
+    const dx = p.px - player.x, dy = p.py - player.y;
+    if (Math.hypot(dx, dy) < 28) {
+      ctx.font = '11px Space Mono, monospace';
+      ctx.fillStyle = '#fff';
+      ctx.textAlign = 'center';
+      ctx.fillText('[E] Talk', p.px, p.py - 18);
+    }
+  });
+}
+
+function gameLoop() {
+  if (STATE.phase !== 'playing') return;
+  handleMovement();
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  drawMap();
+  drawPogs();
+  drawNearPogHint();
+  drawPlayer();
+  checkPogProximity();
+  animId = requestAnimationFrame(gameLoop);
+}
+
+// ─── MOVEMENT ──────────────────────────────────────────────────────────────
+function handleMovement() {
+  let dx = 0, dy = 0;
+  if (keys['ArrowUp'] || keys['w'] || keys['W'])    { dy = -player.speed; player.dir = 0; }
+  if (keys['ArrowRight'] || keys['d'] || keys['D']) { dx =  player.speed; player.dir = 1; }
+  if (keys['ArrowDown'] || keys['s'] || keys['S'])  { dy =  player.speed; player.dir = 2; }
+  if (keys['ArrowLeft'] || keys['a'] || keys['A'])  { dx = -player.speed; player.dir = 3; }
+  tryMove(dx, 0);
+  tryMove(0, dy);
+}
+
+function tryMove(dx, dy) {
+  const nx = player.x + dx, ny = player.y + dy;
+  const col = Math.floor(nx / TS), row = Math.floor(ny / TS);
+  if (row >= 0 && row < ROWS && col >= 0 && col < COLS && tileWalkable(MILLHAVEN[row][col])) {
+    player.x = nx; player.y = ny;
+  }
+}
+
+document.addEventListener('keydown', e => {
+  keys[e.key] = true;
+  if (e.key === 'p' || e.key === 'P') {
+    if (STATE.phase === 'playing') pauseGame();
+    else if (STATE.phase === 'paused') resumeGame();
+  }
+  if ((e.key === 'e' || e.key === 'E' || e.key === ' ') && STATE.phase === 'playing') {
+    tryInteract();
+  }
+});
+document.addEventListener('keyup', e => { delete keys[e.key]; });
+
+// ─── POG PROXIMITY & INTERACTION ──────────────────────────────────────────
+function checkPogProximity() {
+  // no auto-collect; E/Space triggers it
+}
+
+function tryInteract() {
+  let closest = null, closestDist = Infinity;
+  pogs.forEach(p => {
+    if (p.collected) return;
+    const d = Math.hypot(p.px - player.x, p.py - player.y);
+    if (d < 28 && d < closestDist) { closest = p; closestDist = d; }
+  });
+  if (closest) openQuiz(closest);
+}
+
+// ─── QUIZ ──────────────────────────────────────────────────────────────────
+function openQuiz(pog) {
+  STATE.phase = 'quiz';
+  STATE.activeQuizPog = pog;
+  cancelAnimationFrame(animId);
+  document.getElementById('quiz-pog-label').textContent =
+    `${pog.diff.toUpperCase()} PROSPECT — ${pog.pts} PT${pog.pts > 1 ? 'S' : ''} — [${pog.table}]`;
+  document.getElementById('quiz-question').textContent = pog.q;
+  const optsDiv = document.getElementById('quiz-options');
+  optsDiv.innerHTML = '';
+  pog.opts.forEach((opt, i) => {
+    const btn = document.createElement('button');
+    btn.className = 'quiz-opt';
+    btn.textContent = opt;
+    btn.onclick = () => answerQuiz(i, pog);
+    optsDiv.appendChild(btn);
+  });
+  document.getElementById('quiz-feedback').textContent = '';
+  document.getElementById('quiz-feedback').className = 'quiz-feedback';
+  document.getElementById('quiz-continue-btn').style.display = 'none';
+  showOverlay('overlay-quiz');
+}
+
+function answerQuiz(idx, pog) {
+  const opts = document.querySelectorAll('.quiz-opt');
+  opts.forEach(b => b.onclick = null);
+  const fb = document.getElementById('quiz-feedback');
+  if (idx === pog.ans) {
+    opts[idx].classList.add('correct');
+    fb.textContent = '✓ Correct! Prospect secured.';
+    fb.className = 'quiz-feedback ok';
+    collectPog(pog);
+    STATE.quizStreak++;
+    if (STATE.quizStreak > 0 && STATE.quizStreak % 3 === 0) {
+      addScore(5);
+      fb.textContent += ' +5 streak bonus!';
+    }
+  } else {
+    opts[idx].classList.add('wrong');
+    opts[pog.ans].classList.add('correct');
+    fb.textContent = '✗ Wrong. They walked.';
+    fb.className = 'quiz-feedback bad';
+    STATE.quizStreak = 0;
+  }
+  document.getElementById('quiz-continue-btn').style.display = 'block';
+}
+
+function collectPog(pog) {
+  pog.collected = true;
+  addScore(pog.pts);
+  STATE.pogsCollected++;
+  document.getElementById('hud-pog-count').textContent = STATE.pogsCollected;
+  checkCityComplete();
+}
+
+function addScore(pts) {
+  STATE.score += pts;
+  document.getElementById('hud-score-val').textContent = STATE.score;
+  flashScore(`+${pts}`);
+  saveSession();
+}
+
+function flashScore(text) {
+  const el = document.getElementById('score-flash');
+  el.textContent = text;
+  el.style.opacity = '1';
+  setTimeout(() => { el.style.opacity = '0'; }, 900);
+}
+
+function closeQuiz() {
+  hideOverlay('overlay-quiz');
+  checkCityComplete();
+  if (STATE.phase === 'quiz') {
+    STATE.phase = 'playing';
+    gameLoop();
+  }
+}
+
+function checkCityComplete() {
+  const remaining = pogs.filter(p => !p.collected).length;
+  if (remaining === 0) {
+    STATE.phase = 'city-clear';
+    cancelAnimationFrame(animId);
+    addScore(10);
+    STATE.citiesCleared++;
+    document.getElementById('city-clear-msg').textContent =
+      `Millhaven cleared! Score: ${STATE.score} pts | Pogs: ${STATE.pogsCollected}`;
+    showOverlay('overlay-city-clear');
+    document.getElementById('btn-next-city').style.display = 'none'; // more cities coming
+    saveSession();
+  }
+}
+
+// ─── PAUSE / RESUME ────────────────────────────────────────────────────────
+function pauseGame() {
+  STATE.prePausePhase = STATE.phase;
+  STATE.phase = 'paused';
+  cancelAnimationFrame(animId);
+  if (STATE.timerInterval) { clearInterval(STATE.timerInterval); }
+  showOverlay('overlay-pause');
+}
+
+function resumeGame() {
+  hideOverlay('overlay-pause');
+  STATE.phase = 'playing';
+  gameLoop();
+}
+
+// ─── MANUAL (MR B BRIEFING) ────────────────────────────────────────────────
+function openManual() {
+  STATE.prePausePhase = STATE.phase;
+  if (STATE.phase === 'playing') {
+    STATE.phase = 'manual-open';
+    cancelAnimationFrame(animId);
+    if (STATE.timerInterval) clearInterval(STATE.timerInterval);
+  }
+  showOverlay('overlay-manual');
+}
+
+function closeManual() {
+  hideOverlay('overlay-manual');
+  if (STATE.prePausePhase === 'playing' || STATE.phase === 'manual-open') {
+    STATE.phase = 'playing';
+    gameLoop();
+  }
+}
+
+// ─── OVERLAY HELPERS ───────────────────────────────────────────────────────
+function showOverlay(id) {
+  document.querySelectorAll('.overlay').forEach(o => o.classList.add('hidden'));
+  document.getElementById(id).classList.remove('hidden');
+}
+function hideOverlay(id) {
+  document.getElementById(id).classList.add('hidden');
+}
+
+// ─── SUPABASE PLAYER / SESSION ─────────────────────────────────────────────
+async function startGame() {
+  const name = document.getElementById('input-name').value.trim() || 'Anonymous';
+  STATE.playerName = name;
+
+  // Upsert player by display_name
+  let playerRows = await dbFetch('tr_players', {
+    method: 'GET', select: '*', filters: `display_name=eq.${encodeURIComponent(name)}&limit=1`
+  });
+  if (!playerRows || playerRows.length === 0) {
+    const created = await dbFetch('tr_players', {
+      method: 'POST',
+      body: { display_name: name, lifetime_points: 0, total_pogs: 0, total_runs: 0 }
+    });
+    STATE.playerId = created?.[0]?.id || null;
+  } else {
+    STATE.playerId = playerRows[0].id;
+  }
+
+  // Create session
+  const sess = await dbFetch('tr_sessions', {
+    method: 'POST',
+    body: {
+      player_id: STATE.playerId,
+      display_name: name,
+      total_score: 0,
+      pogs_collected: 0,
+      cities_cleared: 0,
+      status: 'active'
+    }
+  });
+  STATE.sessionId = sess?.[0]?.id || null;
+
+  resetPogs();
+  hideOverlay('overlay-start');
+  STATE.phase = 'playing';
+  gameLoop();
+}
+
+async function resumeSession() {
+  const sid = document.getElementById('input-session').value.trim();
+  const statusEl = document.getElementById('resume-status');
+  if (!sid) { statusEl.textContent = 'Paste a Session ID first.'; statusEl.className = 'status-msg err'; return; }
+  statusEl.textContent = 'Looking up session…';
+  statusEl.className = 'status-msg';
+  const rows = await dbFetch('tr_sessions', { select: '*', filters: `id=eq.${sid}` });
+  if (!rows || rows.length === 0) {
+    statusEl.textContent = 'Session not found. Check the ID and try again.';
+    statusEl.className = 'status-msg err';
+    return;
+  }
+  const s = rows[0];
+  statusEl.textContent = `Found: ${s.display_name} — ${s.total_score} pts`;
+  statusEl.className = 'status-msg ok';
+  STATE.sessionId = s.id;
+  STATE.playerId = s.player_id;
+  STATE.playerName = s.display_name;
+  STATE.score = s.total_score || 0;
+  STATE.pogsCollected = s.pogs_collected || 0;
+  STATE.citiesCleared = s.cities_cleared || 0;
+  document.getElementById('hud-score-val').textContent = STATE.score;
+  document.getElementById('hud-pog-count').textContent = STATE.pogsCollected;
+  resetPogs();
+  hideOverlay('overlay-start');
+  STATE.phase = 'playing';
+  gameLoop();
+}
+
+async function saveSession() {
+  if (!STATE.sessionId) return;
+  await dbFetch(`tr_sessions?id=eq.${STATE.sessionId}`, {
+    method: 'PATCH',
+    body: {
+      total_score: STATE.score,
+      pogs_collected: STATE.pogsCollected,
+      cities_cleared: STATE.citiesCleared,
+      last_active_at: new Date().toISOString()
+    }
+  });
+  if (STATE.playerId) {
+    await dbFetch(`tr_players?id=eq.${STATE.playerId}`, {
+      method: 'PATCH',
+      body: { lifetime_points: STATE.score, total_pogs: STATE.pogsCollected }
+    });
+  }
+}
+
+async function endRun() {
+  STATE.phase = 'run-end';
+  cancelAnimationFrame(animId);
+  if (STATE.sessionId) {
+    await dbFetch(`tr_sessions?id=eq.${STATE.sessionId}`, {
+      method: 'PATCH',
+      body: { status: 'complete', total_score: STATE.score }
+    });
+  }
+  document.getElementById('run-end-msg').textContent =
+    `${STATE.playerName} — ${STATE.score} pts | ${STATE.pogsCollected} pogs | ${STATE.citiesCleared} cities cleared`;
+  if (STATE.sessionId) {
+    document.getElementById('session-id-box').innerHTML =
+      `Session ID<br><span>${STATE.sessionId}</span>`;
+  }
+  loadLeaderboard();
+  showOverlay('overlay-run-end');
+}
+
+async function loadLeaderboard() {
+  const rows = await dbFetch('tr_players', {
+    select: 'display_name,lifetime_points,total_pogs',
+    order: 'lifetime_points.desc',
+    limit: 10
+  });
+  const tbody = document.getElementById('lb-body');
+  tbody.innerHTML = '';
+  if (!rows) return;
+  rows.forEach((r, i) => {
+    const tr = document.createElement('tr');
+    if (r.display_name === STATE.playerName) tr.className = 'me';
+    tr.innerHTML = `<td>${i+1}</td><td>${r.display_name}</td><td>${r.lifetime_points}</td><td>${r.total_pogs}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function copySession() {
+  if (STATE.sessionId) navigator.clipboard.writeText(STATE.sessionId);
+}
+
+function nextCity() {
+  // Phase 2+ cities coming
+  endRun();
+}
+
+function newRun() {
+  STATE.score = 0; STATE.pogsCollected = 0;
+  STATE.citiesCleared = 0; STATE.sessionId = null;
+  STATE.playerId = null; STATE.quizStreak = 0;
+  document.getElementById('hud-score-val').textContent = 0;
+  document.getElementById('hud-pog-count').textContent = 0;
+  showOverlay('overlay-start');
+}
+
+// ─── EMBED MR B PORTRAIT ───────────────────────────────────────────────────
+// Image is hosted via GitHub alongside index.html
+document.getElementById('mrb-img').src = 'mrBigglesworth.jpg';
+</script>
+</body>
+</html>
